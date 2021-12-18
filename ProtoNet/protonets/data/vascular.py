@@ -10,8 +10,8 @@ from torchnet.transform import compose
 
 from protonets.data.base import convert_dict, CudaTransform, EpisodicBatchSampler, SequentialBatchSampler
 
-OMNIGLOT_DATA_DIR = os.path.join(os.path.dirname(__file__), '../../data/vasc_all_data')
-OMNIGLOT_CACHE = {}
+VASCULAR_DATA_DIR = os.path.join(os.path.dirname(__file__), '../../data/vasc_all_data')
+VASCULAR_CACHE = {}
 
 
 def load_image_path(key, out_field, d):
@@ -20,7 +20,7 @@ def load_image_path(key, out_field, d):
 
 
 def convert_tensor(key, d):
-    d[key] = 1.0 - torch.from_numpy(np.array(d[key], np.float32, copy=False)).transpose(0, 1).contiguous().view(1, d[
+    d[key] = 1.0 - torch.from_numpy(np.array(d[key], np.float32, copy=False)).transpose(0, 1).contiguous().view(3, d[
         key].size[0], d[key].size[1])
     return d
 
@@ -36,30 +36,28 @@ def scale_image(key, height, width, d):
 
 
 def load_class_images(d):
-    if d['class'] not in OMNIGLOT_CACHE:
-        alphabet, character, rot = d['class'].split('/')
-        image_dir = os.path.join(OMNIGLOT_DATA_DIR, 'data', alphabet, character)
-
-        class_images = sorted(glob.glob(os.path.join(image_dir, '*.png')))
+    if d['class'] not in VASCULAR_CACHE:
+        x_dir,x_file = d['class'].split('/')
+        image_dir = os.path.join(VASCULAR_DATA_DIR, 'data', x_dir)
+        class_images = sorted(glob.glob(os.path.join(image_dir, '*.jpg')))
         if len(class_images) == 0:
             raise Exception(
-                "No images found for omniglot class {} at {}. Did you run download_omniglot.sh first?".format(
+                "No images found for vascular structures class {} at {}.".format(
                     d['class'], image_dir))
 
         image_ds = TransformDataset(ListDataset(class_images),
                                     compose([partial(convert_dict, 'file_name'),
                                              partial(load_image_path, 'file_name', 'data'),
-                                             partial(rotate_image, 'data', float(rot[3:])),
-                                             partial(scale_image, 'data', 28, 28),
+                                             partial(scale_image, 'data', 224, 224),
                                              partial(convert_tensor, 'data')]))
 
         loader = torch.utils.data.DataLoader(image_ds, batch_size=len(image_ds), shuffle=False)
 
         for sample in loader:
-            OMNIGLOT_CACHE[d['class']] = sample['data']
+            VASCULAR_CACHE[d['class']] = sample['data']
             break  # only need one sample because batch size equal to dataset length
 
-    return {'class': d['class'], 'data': OMNIGLOT_CACHE[d['class']]}
+    return {'class': d['class'], 'data': VASCULAR_CACHE[d['class']]}
 
 
 def extract_episode(n_support, n_query, d):
@@ -84,7 +82,7 @@ def extract_episode(n_support, n_query, d):
 
 
 def load(opt, splits):
-    split_dir = os.path.join(OMNIGLOT_DATA_DIR, 'splits', opt['data.split'])
+    split_dir = os.path.join(VASCULAR_DATA_DIR, 'splits', opt['data.split'])
 
     ret = {}
     for split in splits:

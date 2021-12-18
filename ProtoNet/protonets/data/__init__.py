@@ -1,2 +1,2 @@
 from . import omniglot
-# from . import vascular
+from . import vascular
